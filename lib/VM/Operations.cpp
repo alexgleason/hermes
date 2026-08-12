@@ -1284,17 +1284,17 @@ addOp_RJS(Runtime &runtime, Handle<> xHandle, Handle<> yHandle) {
 
   // If one of the values is a string, concatenate as strings.
   if (xPrim->isString() || yPrim->isString()) {
-    auto resX = toString_RJS(runtime, xPrim);
-    if (resX == ExecutionStatus::EXCEPTION) {
+    auto strResX = toString_RJS(runtime, xPrim);
+    if (strResX == ExecutionStatus::EXCEPTION) {
       return ExecutionStatus::EXCEPTION;
     }
-    auto xStr = runtime.makeHandle(std::move(*resX));
+    auto xStr = runtime.makeHandle(std::move(*strResX));
 
-    auto resY = toString_RJS(runtime, yPrim);
-    if (resY == ExecutionStatus::EXCEPTION) {
+    auto strResY = toString_RJS(runtime, yPrim);
+    if (strResY == ExecutionStatus::EXCEPTION) {
       return ExecutionStatus::EXCEPTION;
     }
-    auto yStr = runtime.makeHandle(std::move(*resY));
+    auto yStr = runtime.makeHandle(std::move(*strResY));
 
     return StringPrimitive::concat(runtime, xStr, yStr);
   }
