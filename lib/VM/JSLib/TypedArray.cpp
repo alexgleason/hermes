@@ -422,15 +422,15 @@ class TypedArraySortModel : public SortModel {
           if (LLVM_UNLIKELY(aVal.isBigInt())) {
             return aVal.getBigInt()->compare(bVal.getBigInt());
           } else {
-            double a = aVal.getNumber();
-            double b = bVal.getNumber();
-            if (LLVM_UNLIKELY(a == 0) && LLVM_UNLIKELY(b == 0) &&
-                LLVM_UNLIKELY(std::signbit(a)) &&
-                LLVM_UNLIKELY(!std::signbit(b))) {
+            double aNum = aVal.getNumber();
+            double bNum = bVal.getNumber();
+            if (LLVM_UNLIKELY(aNum == 0) && LLVM_UNLIKELY(bNum == 0) &&
+                LLVM_UNLIKELY(std::signbit(aNum)) &&
+                LLVM_UNLIKELY(!std::signbit(bNum))) {
               // -0 < +0, according to the spec.
               return -1;
             }
-            return (a < b) ? -1 : (a > b ? 1 : 0);
+            return (aNum < bNum) ? -1 : (aNum > bNum ? 1 : 0);
           }
           assert(
               compareFn_ && "Cannot use this version if the compareFn is null");
