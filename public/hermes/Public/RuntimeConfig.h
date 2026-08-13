@@ -133,7 +133,17 @@ class PinnedHermesValue;
   F(constexpr, bool, Test262, false)                                   \
   /* RUNTIME_FIELDS END */
 
-_HERMES_CTORCONFIG_STRUCT(RuntimeConfig, RUNTIME_FIELDS, {})
+/// Version of RuntimeConfig.
+/// Changing RuntimeConfig in a non-compatible way (e.g., adding new field in
+/// the middle or changing field types) requires bumping the version.
+/// Date: Aug 10, 2026
+#define HERMES_RUNTIME_CONFIG_VERSION 1
+
+_HERMES_CTORCONFIG_STRUCT(
+    RuntimeConfig,
+    HERMES_RUNTIME_CONFIG_VERSION,
+    RUNTIME_FIELDS,
+    {})
 
 #undef RUNTIME_FIELDS
 
