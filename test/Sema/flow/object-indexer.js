@@ -73,7 +73,7 @@ function delWO(o: WO): void {
 // CHECK-NEXT:})
 
 // CHECK:SemContext
-// CHECK-NEXT:Func strict
+// CHECK-NEXT:Func strict mayReachImplicitReturn
 // CHECK-NEXT:    Scope %s.1
 // CHECK-NEXT:        Decl %d.1 'exports' Parameter : any
 // CHECK-NEXT:        Decl %d.2 'd' Let : %object.2
@@ -89,15 +89,15 @@ function delWO(o: WO): void {
 // CHECK-NEXT:        hoistedFunction readRO
 // CHECK-NEXT:        hoistedFunction writeWO
 // CHECK-NEXT:        hoistedFunction delWO
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.2
 // CHECK-NEXT:            Decl %d.12 'o' Parameter : %object.4
 // CHECK-NEXT:            Decl %d.13 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict mayReachImplicitReturn
 // CHECK-NEXT:        Scope %s.3
 // CHECK-NEXT:            Decl %d.14 'o' Parameter : %object.5
 // CHECK-NEXT:            Decl %d.15 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict mayReachImplicitReturn
 // CHECK-NEXT:        Scope %s.4
 // CHECK-NEXT:            Decl %d.16 'o' Parameter : %object.5
 // CHECK-NEXT:            Decl %d.17 'arguments' Var Arguments

@@ -64,7 +64,7 @@ function dropRead(a: {x: number}): {-x: number} {
 // CHECK-NEXT:})
 
 // CHECK:SemContext
-// CHECK-NEXT:Func strict
+// CHECK-NEXT:Func strict mayReachImplicitReturn
 // CHECK-NEXT:    Scope %s.1
 // CHECK-NEXT:        Decl %d.1 'exports' Parameter : any
 // CHECK-NEXT:        Decl %d.2 'widenRO' Var : %function.3
@@ -80,27 +80,27 @@ function dropRead(a: {x: number}): {-x: number} {
 // CHECK-NEXT:        hoistedFunction sameWO
 // CHECK-NEXT:        hoistedFunction dropWrite
 // CHECK-NEXT:        hoistedFunction dropRead
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.2
 // CHECK-NEXT:            Decl %d.9 'a' Parameter : %object.2
 // CHECK-NEXT:            Decl %d.10 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.3
 // CHECK-NEXT:            Decl %d.11 'a' Parameter : %object.4
 // CHECK-NEXT:            Decl %d.12 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.4
 // CHECK-NEXT:            Decl %d.13 'a' Parameter : %object.2
 // CHECK-NEXT:            Decl %d.14 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.5
 // CHECK-NEXT:            Decl %d.15 'a' Parameter : %object.7
 // CHECK-NEXT:            Decl %d.16 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.6
 // CHECK-NEXT:            Decl %d.17 'a' Parameter : %object.9
 // CHECK-NEXT:            Decl %d.18 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.7
 // CHECK-NEXT:            Decl %d.19 'a' Parameter : %object.9
 // CHECK-NEXT:            Decl %d.20 'arguments' Var Arguments

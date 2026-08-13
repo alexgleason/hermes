@@ -74,7 +74,7 @@ function invariantToReadOnlyWiden(o: {x: number}): {+x: number | string} {
 // CHECK-NEXT:%union.12 = union(string | number)
 
 // CHECK:SemContext
-// CHECK-NEXT:Func strict
+// CHECK-NEXT:Func strict mayReachImplicitReturn
 // CHECK-NEXT:    Scope %s.1
 // CHECK-NEXT:        Decl %d.1 'exports' Parameter : any
 // CHECK-NEXT:        Decl %d.2 'readRO' Var : %function.5
@@ -90,29 +90,29 @@ function invariantToReadOnlyWiden(o: {x: number}): {+x: number | string} {
 // CHECK-NEXT:        hoistedFunction spreadDropsVariance
 // CHECK-NEXT:        hoistedFunction letDestrReadonly
 // CHECK-NEXT:        hoistedFunction invariantToReadOnlyWiden
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.2
 // CHECK-NEXT:            Decl %d.9 'o' Parameter : %object.2
 // CHECK-NEXT:            Decl %d.10 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict mayReachImplicitReturn
 // CHECK-NEXT:        Scope %s.3
 // CHECK-NEXT:            Decl %d.11 'o' Parameter : %object.3
 // CHECK-NEXT:            Decl %d.12 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict mayReachImplicitReturn
 // CHECK-NEXT:        Scope %s.4
 // CHECK-NEXT:            Decl %d.13 'o' Parameter : %object.4
 // CHECK-NEXT:            Decl %d.14 '_r' Let : number
 // CHECK-NEXT:            Decl %d.15 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.5
 // CHECK-NEXT:            Decl %d.16 'o' Parameter : %object.2
 // CHECK-NEXT:            Decl %d.17 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.6
 // CHECK-NEXT:            Decl %d.18 'o' Parameter : %object.2
 // CHECK-NEXT:            Decl %d.19 'x' Let : number
 // CHECK-NEXT:            Decl %d.20 'arguments' Var Arguments
-// CHECK-NEXT:    Func strict
+// CHECK-NEXT:    Func strict noImplicitReturn
 // CHECK-NEXT:        Scope %s.7
 // CHECK-NEXT:            Decl %d.21 'o' Parameter : %object.9
 // CHECK-NEXT:            Decl %d.22 'arguments' Var Arguments
