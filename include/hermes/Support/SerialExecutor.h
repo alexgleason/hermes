@@ -62,6 +62,10 @@ class SerialExecutor {
   /// additional work is enqueued.
   std::chrono::milliseconds timeout_;
 
+  /// If set, wraps execution of each worker thread. This is the same as
+  /// ThreadRunner defined in RuntimeConfig.h.
+  std::function<void(std::function<void()>)> threadRunner_;
+
   /// This is executed on a new thread. It will run forever, executing tasks as
   /// they are posted. This stops running when shouldStop_ is set to true.
   void run();
@@ -70,12 +74,18 @@ class SerialExecutor {
   static void *threadMain(void *p);
 
  public:
-  /// Initialize a SerialExecutor with a worker thread that has a stack size of
-  /// \p stackSize and will remain live for \p timeout without additional work.
+  /// Initialize a SerialExecutor whose worker thread has a stack size of
+  /// \p stackSize, remains live for \p timeout without additional work, and is
+  /// wrapped by \p threadRunner when it is created. \p threadRunner must
+  /// satisfy the contract documented on vm::ThreadRunner. In addition, it must
+  /// not block after run() returns.
   SerialExecutor(
       size_t stackSize = 0,
-      std::chrono::milliseconds timeout = std::chrono::milliseconds::max())
-      : stackSize_(stackSize), timeout_(timeout) {}
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::max(),
+      std::function<void(std::function<void()>)> threadRunner = {})
+      : stackSize_(stackSize),
+        timeout_(timeout),
+        threadRunner_(std::move(threadRunner)) {}
 
   /// Make sure that the spawned thread has terminated. Will block if there is a
   /// long-running task currently being executed.

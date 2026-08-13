@@ -12,7 +12,9 @@
 #include "hermes/Public/GCConfig.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 
 namespace hermes {
 namespace vm {
@@ -31,6 +33,15 @@ enum class SynthTraceMode : int8_t {
 };
 
 class PinnedHermesValue;
+
+/// Runs a thread's main function inside an embedder-provided scope.
+/// A non-empty runner must invoke its argument exactly once and must not return
+/// until the argument has returned; a runner that skips it silently discards
+/// everything the thread was going to do. An empty runner leaves the thread
+/// unwrapped.
+/// The runner must not throw. Hermes VM is compiled with exceptions disabled
+/// on most platforms, so an escaping exception terminates the process.
+using ThreadRunner = std::function<void(std::function<void()>)>;
 
 // Parameters for Runtime initialisation.  Check documentation in README.md
 // constexpr indicates that the default value is constexpr.
@@ -131,6 +142,20 @@ class PinnedHermesValue;
                                                                        \
   /* Increase compliance with test262 (stricter checks at runtime). */ \
   F(constexpr, bool, Test262, false)                                   \
+                                                                       \
+  /* Wrap execution of the JSI finalizer worker thread. */             \
+  /* HostObject, HostFunction and NativeState destructors run */       \
+  /* there, and like the runner itself they must not throw. */         \
+  /* std::nullopt, the default, selects the platform default, which */ \
+  /* on Android wraps the thread in a JNI ThreadScope. Setting an */   \
+  /* empty ThreadRunner suppresses that and leaves the thread */       \
+  /* unwrapped -- note that this must be spelled */                    \
+  /* withFinalizerThreadRunner(ThreadRunner{}), since a bare {} is */  \
+  /* nullopt and so selects the platform default instead. */           \
+  F(HERMES_NON_CONSTEXPR,                                              \
+    std::optional<ThreadRunner>,                                       \
+    FinalizerThreadRunner,                                             \
+    std::nullopt)                                                      \
   /* RUNTIME_FIELDS END */
 
 /// Version of RuntimeConfig.

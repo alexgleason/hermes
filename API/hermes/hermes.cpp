@@ -70,6 +70,10 @@
 #include <jsi/instrumentation.h>
 #include <jsi/threadsafe.h>
 
+#ifdef __ANDROID__
+#include <fbjni/fbjni.h>
+#endif
+
 #ifdef HERMESVM_LLVM_PROFILE_DUMP
 extern "C" {
 int __llvm_profile_dump(void);
@@ -250,6 +254,40 @@ namespace {
 using EventLoopCallback = const std::function<void()>;
 using ScheduleCallbackFunc = std::function<void(EventLoopCallback)>;
 
+/// Return the runner to install on the finalizer worker thread when the
+/// embedder did not configure one: a JNI ThreadScope wrapper on Android, and
+/// an empty runner, which leaves the thread unwrapped, everywhere else.
+vm::ThreadRunner makeDefaultFinalizerThreadRunner() {
+#ifdef __ANDROID__
+  return [](std::function<void()> run) {
+    // Finalizers may release JNI references, which requires the thread to be
+    // attached to the JVM. ThreadScope's constructor throws when fbjni has no
+    // JavaVM. Nothing may escape into SerialExecutor, which is compiled
+    // without exceptions, so report any failure as a Hermes fatal error
+    // instead of letting it terminate the process without a diagnostic.
+    try {
+      const facebook::jni::ThreadScope scope;
+      run();
+    } catch (const std::exception &e) {
+      ::hermes::hermes_fatal(
+          std::string("Exception on the JSI finalizer thread: ") + e.what());
+    } catch (...) {
+      ::hermes::hermes_fatal("Unknown exception on the JSI finalizer thread");
+    }
+  };
+#else
+  return {};
+#endif
+}
+
+/// Return the embedder's finalizer thread runner, falling back to the platform
+/// default when none was configured. A configured runner is used as-is, so an
+/// explicitly empty one suppresses the platform default.
+vm::ThreadRunner finalizerThreadRunner(const vm::RuntimeConfig &runtimeConfig) {
+  auto runner = runtimeConfig.getFinalizerThreadRunner();
+  return runner ? std::move(*runner) : makeDefaultFinalizerThreadRunner();
+}
+
 class HermesRuntimeImpl final : public HermesRuntime,
                                 private IHermesTestHelpers,
                                 private InstallHermesFatalErrorHandler,
@@ -268,6 +306,10 @@ class HermesRuntimeImpl final : public HermesRuntime,
         rt_(::hermes::vm::Runtime::create(runtimeConfig)),
         runtime_(*rt_),
         vmExperimentFlags_(runtimeConfig.getVMExperimentFlags()),
+        finalizerExecutor_(
+            0,
+            std::chrono::milliseconds::max(),
+            finalizerThreadRunner(runtimeConfig)),
         mutatorScope{runtime_} {
 #ifdef HERMES_ENABLE_DEBUGGER
     compileFlags_.debug = true;

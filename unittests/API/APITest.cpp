@@ -17,6 +17,7 @@
 #include <jsi/test/testlib.h>
 
 #include <atomic>
+#include <thread>
 #include <tuple>
 
 using namespace facebook::jsi;
@@ -58,6 +59,88 @@ class HermesRuntimeCustomConfigTest : public ::testing::Test,
   HermesRuntimeCustomConfigTest(::hermes::vm::RuntimeConfig runtimeConfig)
       : HermesRuntimeTestBase(makeHermesRuntime(runtimeConfig)) {}
 };
+
+TEST(HermesRuntimeConfigTest, FinalizerThreadRunner) {
+  struct RunnerState {
+    std::atomic<bool> active{false};
+    std::atomic<std::thread::id> thread{std::thread::id{}};
+    std::atomic<bool> finalizedUnderRunner{false};
+    std::atomic<bool> finalizedOnRunnerThread{false};
+  } state;
+
+  class TestHostObject final : public HostObject {
+   public:
+    explicit TestHostObject(RunnerState &state) : state_(state) {}
+
+    ~TestHostObject() override {
+      state_.finalizedUnderRunner = state_.active.load();
+      state_.finalizedOnRunnerThread =
+          state_.thread.load() == std::this_thread::get_id();
+    }
+
+   private:
+    RunnerState &state_;
+  };
+
+  auto runtime = makeHermesRuntime(
+      ::hermes::vm::RuntimeConfig::Builder()
+          .withFinalizerThreadRunner([&state](std::function<void()> run) {
+            state.thread = std::this_thread::get_id();
+            state.active = true;
+            run();
+            state.active = false;
+          })
+          .build());
+  runtime->global().setProperty(
+      *runtime,
+      "hostObject",
+      Object::createFromHostObject(
+          *runtime, std::make_shared<TestHostObject>(state)));
+
+  runtime.reset();
+
+  EXPECT_TRUE(state.finalizedUnderRunner);
+  // Without this the test would also pass if the finalizer ran on the thread
+  // destroying the runtime while the worker happened to be alive.
+  EXPECT_TRUE(state.finalizedOnRunnerThread);
+  EXPECT_FALSE(state.active);
+}
+
+TEST(HermesRuntimeConfigTest, EmptyFinalizerThreadRunner) {
+  // An empty runner is not the same as an unset one: it suppresses the
+  // platform default instead of selecting it. Nothing platform independent
+  // observes the difference, so this only checks that the runtime still
+  // finalizes; the Android behavior it controls is covered by
+  // HostObjectJniTest.
+  std::atomic<bool> finalized{false};
+
+  class TestHostObject final : public HostObject {
+   public:
+    explicit TestHostObject(std::atomic<bool> &finalized)
+        : finalized_(finalized) {}
+
+    ~TestHostObject() override {
+      finalized_ = true;
+    }
+
+   private:
+    std::atomic<bool> &finalized_;
+  };
+
+  auto runtime = makeHermesRuntime(
+      ::hermes::vm::RuntimeConfig::Builder()
+          .withFinalizerThreadRunner(::hermes::vm::ThreadRunner{})
+          .build());
+  runtime->global().setProperty(
+      *runtime,
+      "hostObject",
+      Object::createFromHostObject(
+          *runtime, std::make_shared<TestHostObject>(finalized)));
+
+  runtime.reset();
+
+  EXPECT_TRUE(finalized);
+}
 
 class HermesRuntimeTest : public ::testing::TestWithParam<RuntimeFactory>,
                           public HermesRuntimeTestBase {
