@@ -992,6 +992,11 @@ void SemanticResolver::visit(ClassPrivatePropertyNode *node) {
     // This will insert the `arguments` identifer into the binding table scope
     // which is created by the class declaration / expression node.
     declareArguments();
+    // Make the initializer function's body scope current, so any scopes
+    // created by the initializer expression (e.g. by a class expression) are
+    // parented in it, matching the runtime environment chain.
+    llvh::SaveAndRestore<LexicalScope *> oldScope{
+        curScope_, curFunctionInfo()->getFunctionBodyScope()};
     visitESTreeNode(*this, node->_value, node);
   } else if (!typed_) {
     // Create the these initializers even if no value initializer is present, in
@@ -1037,6 +1042,11 @@ void SemanticResolver::visit(ESTree::ClassPropertyNode *node) {
             ? curClassContext_->getOrCreateStaticElementsInitFunctionInfo()
             : curClassContext_->getOrCreateInstanceElementsInitFunctionInfo());
     declareArguments();
+    // Make the initializer function's body scope current, so any scopes
+    // created by the initializer expression (e.g. by a class expression) are
+    // parented in it, matching the runtime environment chain.
+    llvh::SaveAndRestore<LexicalScope *> oldScope{
+        curScope_, curFunctionInfo()->getFunctionBodyScope()};
     visitESTreeNode(*this, node->_value, node);
   } else if (!typed_) {
     // Create the these initializers even if no value initializer is present, in
