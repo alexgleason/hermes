@@ -124,7 +124,6 @@ type Package =
   | 'hermes-parser'
   | 'hermes-transform'
   | 'flow-transform'
-  | 'flow-api-translator'
   | 'prettier-plugin-hermes-parser'
   | 'babel-plugin-syntax-hermes-parser';
 

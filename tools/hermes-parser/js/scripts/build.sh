@@ -13,7 +13,6 @@ PACKAGES=(
   hermes-parser
   hermes-eslint
   hermes-transform
-  flow-api-translator
   babel-plugin-syntax-hermes-parser
 )
 

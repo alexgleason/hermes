@@ -1,6 +1,6 @@
 # Hermes Parser JS Packages
 
-This directory contains the JavaScript packages for the Hermes parser: `hermes-estree`, `hermes-parser`, `hermes-transform`, `hermes-eslint`, `flow-api-translator`, and `babel-plugin-syntax-hermes-parser`.
+This directory contains the JavaScript packages for the Hermes parser: `hermes-estree`, `hermes-parser`, `hermes-transform`, `hermes-eslint`, and `babel-plugin-syntax-hermes-parser`.
 
 ## Prerequisites
 
@@ -49,9 +49,6 @@ If one command fails, try the other.
 
 | Pattern | What it runs |
 |---------|-------------|
-| `flowDefToTSDef-test` | flow-api-translator: Flow → TypeScript |
-| `TSDefToFlowDef-test` | flow-api-translator: TypeScript → Flow |
-| `flowToFlowDef-test` | flow-api-translator: Flow → Flow definitions |
 | `TypeAnnotations-test` | hermes-parser: type annotation parsing |
 | `ClassProperty-test` | hermes-parser: class property parsing |
 | `ObjectProperty-test` | hermes-parser: object property parsing |
