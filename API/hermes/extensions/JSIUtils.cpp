@@ -45,6 +45,13 @@ TypedArrayBufferInfo getTypedArrayBuffer(
     throwTypeError(rt, detachedErrorMessage);
   }
 
+  // byteOffset and byteLength come from a caller-supplied object, so they must
+  // be validated.
+  size_t bufferSize = arrayBuffer.size(rt);
+  if (*byteOffset > bufferSize || *byteLength > bufferSize - *byteOffset) {
+    throw jsi::JSError(rt, errorMessage);
+  }
+
   return {bufferData + *byteOffset, *byteLength};
 }
 
