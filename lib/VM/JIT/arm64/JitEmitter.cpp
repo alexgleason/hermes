@@ -3673,7 +3673,6 @@ void Emitter::fastArrayLoad(FR frRes, FR frArr, FR frIdx) {
       frIdx.index());
 #if defined(HERMESVM_COMPRESSED_POINTERS) || defined(HERMESVM_BOXED_DOUBLES)
   syncAllFRTempExcept(frRes != frArr && frRes != frIdx ? frRes : FR());
-  syncAllFRTempExcept({});
   syncToFrame(frArr);
   freeAllFRTempExcept({});
   a.mov(a64::x0, xRuntime);
