@@ -273,6 +273,20 @@ CallResult<HermesValue> hermesInternalGetRuntimeProperties(
     return ExecutionStatus::EXCEPTION;
   }
 
+#ifdef HERMES_RELEASE_CHANNEL
+  auto channelRes =
+      StringPrimitive::create(runtime, createASCIIRef(HERMES_RELEASE_CHANNEL));
+  if (LLVM_UNLIKELY(channelRes == ExecutionStatus::EXCEPTION)) {
+    return ExecutionStatus::EXCEPTION;
+  }
+  lv.tmpHandle = *channelRes;
+  if (LLVM_UNLIKELY(
+          addProperty(lv.tmpHandle, "Release Channel") ==
+          ExecutionStatus::EXCEPTION)) {
+    return ExecutionStatus::EXCEPTION;
+  }
+#endif
+
   lv.tmpHandle =
       HermesValue::encodeBoolValue(runtime.getJITContext().isEnabled());
   if (LLVM_UNLIKELY(
