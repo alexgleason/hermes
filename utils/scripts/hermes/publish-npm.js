@@ -36,7 +36,7 @@ const yargs = require('yargs');
  * For a release run, this script will:
  *  * Version the release by the version specified in the CMakeLists.txt
  *  * Publish to npm
- *     * without setting a tag
+ *     * optionally updating the `latest-v1` tag
  */
 async function main() {
   const argv = yargs
@@ -46,16 +46,23 @@ async function main() {
       choices: ['dry-run', 'release'],
       default: 'dry-run',
     })
+    .option('update-latest-v1', {
+      describe: 'Publish a release using the latest-v1 npm tag.',
+      type: 'boolean',
+      default: false,
+    })
     .strict().argv;
 
   // $FlowFixMe[prop-missing]
   const buildType = argv.builtType;
+  // $FlowFixMe[prop-missing]
+  const updateLatestV1 = argv.updateLatestV1;
 
   if (!validateBuildType(buildType)) {
     throw new Error(`Unsupported build type: ${buildType}`);
   }
 
-  const result = await publishNpm(buildType);
+  const result = await publishNpm(buildType, updateLatestV1);
 
   if (result && result.code) {
     const version = await getVersion(buildType);
@@ -65,19 +72,28 @@ async function main() {
 
 async function publishNpm(
   buildType /*: BuildType */,
+  updateLatestV1 /*: boolean */,
 ) /*: Promise<ShellString | null> */ {
+  const command = getNpmPublishCommand(buildType, updateLatestV1);
+  const packagePath = path.join(REPO_ROOT, 'npm', 'hermes-compiler');
+  const options /*: ExecOptsSync */ = {cwd: packagePath};
+
+  return exec(command, options);
+}
+
+function getNpmPublishCommand(
+  buildType /*: BuildType */,
+  updateLatestV1 /*: boolean */,
+) /*: string */ {
   let tagFlag = '';
 
   if (buildType === 'dry-run') {
     tagFlag = ` --dry-run`;
-  } else if (buildType === 'release') {
+  } else if (buildType === 'release' && updateLatestV1) {
     tagFlag = ` --tag latest-v1`;
   }
 
-  const packagePath = path.join(REPO_ROOT, 'npm', 'hermes-compiler');
-  const options /*: ExecOptsSync */ = {cwd: packagePath};
-
-  return exec(`npm publish${tagFlag}`, options);
+  return `npm publish${tagFlag}`;
 }
 
 if (require.main === module) {

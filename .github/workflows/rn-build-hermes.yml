@@ -11,6 +11,11 @@ on:
           - release
           - dry-run
         default: 'dry-run'
+      update-latest-v1:
+        required: false
+        description: 'Update latest-v1 (unchecked leaves the npm tag unchanged)'
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -77,6 +82,7 @@ jobs:
       ]
     with:
       release-type: ${{ needs.set_release_type.outputs.RELEASE_TYPE }}
+      update-latest-v1: ${{ github.event_name == 'workflow_dispatch' && inputs.update-latest-v1 }}
   create-tag:
     uses: ./.github/workflows/create-tag.yml
     needs: set_release_type
