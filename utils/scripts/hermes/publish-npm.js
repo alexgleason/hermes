@@ -96,8 +96,6 @@ function getNpmPublishCommand(
   return `npm publish${tagFlag}`;
 }
 
-module.exports = {getNpmPublishCommand};
-
 if (require.main === module) {
   void main();
 }
