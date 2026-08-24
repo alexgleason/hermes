@@ -32,7 +32,9 @@
 
 #ifndef _WIN32
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <csetjmp>
 #include <csignal>
@@ -153,6 +155,18 @@ void teardownThreadAltStack() {
     munmap(tCrashGuard.altStackMem, kAltStackSize);
     tCrashGuard.altStackMem = nullptr;
   }
+}
+
+/// The stack size to give each worker thread, or 0 to use the platform
+/// default. Workers run the recursive-descent parser and the interpreter, both
+/// of which recurse proportionally to source nesting depth; the default
+/// secondary-thread stack (512KB on macOS) overflows on deeply nested tests.
+/// Match SerialExecutor and use the main thread's limit.
+size_t workerStackSize() {
+  struct rlimit limit;
+  if (getrlimit(RLIMIT_STACK, &limit) != 0 || limit.rlim_cur == RLIM_INFINITY)
+    return 0;
+  return (size_t)limit.rlim_cur;
 }
 
 #endif // !_WIN32
@@ -1014,6 +1028,26 @@ TestResult executeTestVariantShermes(
   return makeResult(ResultCode::Passed, "PASS");
 }
 
+namespace {
+
+/// Drain \p p (a WorkQueue) until it is finished. Body of a worker thread.
+void *workerMain(void *p) {
+  auto *queue = static_cast<WorkQueue *>(p);
+#ifndef _WIN32
+  setupThreadAltStack();
+#endif
+  std::function<void()> task;
+  while (queue->pop(task)) {
+    task();
+  }
+#ifndef _WIN32
+  teardownThreadAltStack();
+#endif
+  return nullptr;
+}
+
+} // namespace
+
 void WorkQueue::push(std::function<void()> task) {
   std::lock_guard<std::mutex> lock(mutex_);
   tasks_.push_back(std::move(task));
@@ -1065,10 +1099,15 @@ void runAllTests(
     dup2(devNull, STDERR_FILENO);
     close(devNull);
   }
+  auto restoreStderr = llvh::make_scope_exit([savedStderr] {
+    if (savedStderr >= 0) {
+      dup2(savedStderr, STDERR_FILENO);
+      close(savedStderr);
+    }
+  });
 #endif
 
   WorkQueue queue;
-  std::vector<std::thread> workers;
 
   unsigned numWorkers = std::min(config.numThreads, (unsigned)tests.size());
   if (numWorkers == 0)
@@ -1076,22 +1115,32 @@ void runAllTests(
 
 #ifndef _WIN32
   installCrashHandlers();
-#endif
 
+  // Spawn workers with pthread rather than std::thread so the stack size can
+  // be set explicitly; see workerStackSize().
+  std::vector<pthread_t> workers;
+  size_t stackSize = workerStackSize();
   for (unsigned i = 0; i < numWorkers; ++i) {
-    workers.emplace_back([&] {
-#ifndef _WIN32
-      setupThreadAltStack();
-#endif
-      std::function<void()> task;
-      while (queue.pop(task)) {
-        task();
-      }
-#ifndef _WIN32
-      teardownThreadAltStack();
-#endif
-    });
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr) != 0)
+      continue;
+    if (stackSize != 0)
+      pthread_attr_setstacksize(&attr, stackSize);
+    pthread_t tid;
+    if (pthread_create(&tid, &attr, workerMain, &queue) == 0)
+      workers.push_back(tid);
+    pthread_attr_destroy(&attr);
   }
+  if (workers.empty()) {
+    llvh::outs() << "Error: failed to create worker threads\n";
+    return;
+  }
+#else
+  std::vector<std::thread> workers;
+  for (unsigned i = 0; i < numWorkers; ++i) {
+    workers.emplace_back([&queue] { workerMain(&queue); });
+  }
+#endif
 
   {
     // Reporter lifetime brackets the work-dispatch window. Construction
@@ -1123,16 +1172,13 @@ void runAllTests(
 
     queue.finish();
     for (auto &w : workers) {
+#ifndef _WIN32
+      pthread_join(w, nullptr);
+#else
       w.join();
+#endif
     }
   }
-
-#ifndef _WIN32
-  if (savedStderr >= 0) {
-    dup2(savedStderr, STDERR_FILENO);
-    close(savedStderr);
-  }
-#endif
 }
 
 } // namespace testrunner
