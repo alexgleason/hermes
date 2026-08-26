@@ -120,9 +120,13 @@ uint32_t IdentifierHashTable::lookupString(
 }
 
 void IdentifierHashTable::insert(uint32_t idx, SymbolID id) {
+  const uint32_t isIndexDeleted = table_.isDeleted(idx);
   table_.set(idx, id.unsafeGetIndex());
   ++size_;
-  ++nonEmptyEntryCount_;
+  assert(
+      deletedEntryCount_ >= isIndexDeleted &&
+      "deletedEntryCount_ should not underflow");
+  deletedEntryCount_ -= isIndexDeleted;
 
   if (shouldGrow()) {
     if (size_ >= (capacity() >> 2)) {
@@ -176,5 +180,5 @@ void IdentifierHashTable::rehash(uint32_t newCapacity) {
     }
     table_.set(idx, oldVal);
   }
-  nonEmptyEntryCount_ = size_;
+  deletedEntryCount_ = 0;
 }

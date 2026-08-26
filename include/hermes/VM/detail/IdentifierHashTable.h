@@ -41,19 +41,15 @@ class IdentifierHashTable {
   /// Number of valid entries in the hash table.
   uint32_t size_{0};
 
-  /// Number of entries that's not empty. It is important to keep track of
-  /// this value as table searches terminate based on whether we found an
-  /// empty slot. When there are too few empty entries, table search will
-  /// become inefficient. We should grow the table based on the ratio
-  /// between nonEmptyEntryCount and capacity.
-  uint32_t nonEmptyEntryCount_{0};
+  /// Number of deleted entries in the hash table.
+  uint32_t deletedEntryCount_{0};
 
   /// Check whether we need to grow the hash table.
   bool shouldGrow() const {
     auto cap = capacity();
     assert(llvh::isPowerOf2_32(cap) && "capacity must be power of 2");
-    // This is essentially cap * 0.75 < size.
-    return cap - (cap >> 2) < nonEmptyEntryCount_;
+    // This is essentially cap * 0.75 < size + deleted entries.
+    return cap - (cap >> 2) < (size_ + deletedEntryCount_);
   }
 
   /// Grow the hash table to \p newCapacity and rehash into it. Aborts unless
@@ -187,6 +183,7 @@ class IdentifierHashTable {
   void remove(uint32_t idx) {
     table_.markAsDeleted(idx);
     size_--;
+    deletedEntryCount_++;
   }
 
   /// Remove string \p ref from the hash table.

@@ -142,6 +142,41 @@ TEST_F(IdentifierTableLargeHeapTest, HashTableBoundedWithDeletedEntries) {
 
 using IdentifierTableTest = RuntimeTestFixture;
 
+TEST_F(IdentifierTableTest, DeletedEntryReuseDoesNotGrowHashTable) {
+  constexpr uint32_t kCapacity = 16;
+
+  IdentifierTable identifierTable;
+  hermes::vm::detail::IdentifierHashTable hashTable{kCapacity};
+  hashTable.setIdentifierTable(&identifierTable);
+
+  ASCIIRef refs[] = {
+      createASCIIRef("reuse"),
+      createASCIIRef("live-1"),
+      createASCIIRef("live-2"),
+      createASCIIRef("live-3"),
+  };
+  SymbolID reusedID;
+  for (size_t i = 0; i < std::size(refs); ++i) {
+    SymbolID id = identifierTable.registerLazyIdentifier(runtime, refs[i]);
+    uint32_t idx = hashTable.lookupString(refs[i]);
+    hashTable.insert(idx, id);
+    if (i == 0) {
+      reusedID = id;
+    }
+  }
+
+  // Repeated insertion and deletion at the same index should not grow the
+  // capacity.
+  for (size_t i = 0; i < kCapacity; ++i) {
+    uint32_t idx = hashTable.lookupString(refs[0]);
+    // remove() won't rehash the table.
+    hashTable.remove(refs[0]);
+    hashTable.insert(idx, reusedID);
+  }
+
+  EXPECT_EQ(kCapacity, hashTable.capacity());
+}
+
 TEST_F(IdentifierTableTest, NotUniquedSymbol) {
   auto &idTable = runtime.getIdentifierTable();
 
