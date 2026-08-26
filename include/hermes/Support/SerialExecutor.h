@@ -26,6 +26,23 @@ namespace hermes {
 
 /// Simple executor that guarantees serial execution of tasks.
 class SerialExecutor {
+ public:
+  /// Runs a worker thread's main function inside a caller-provided scope.
+  ///
+  /// A non-empty runner must invoke its argument exactly once and must not
+  /// return until the argument has returned; skipping it silently discards
+  /// every task the thread would have run.
+  ///
+  /// The runner must not throw. It is invoked from the thread entry point,
+  /// which is compiled without exceptions on most platforms, so an escaping
+  /// exception terminates the process.
+  ///
+  /// Whatever the runner does after its argument returns delays the thread's
+  /// exit, which add() and the destructor may be waiting for while holding
+  /// mutex_. So that teardown must not block on a thread that uses this
+  /// executor.
+  using ThreadRunner = std::function<void(std::function<void()>)>;
+
  private:
   /// The state of the background executor thread. Protected by mutex_.
   enum class ThreadState {
@@ -63,6 +80,9 @@ class SerialExecutor {
   /// additional work is enqueued.
   std::chrono::nanoseconds timeout_;
 
+  /// If set, wraps execution of each worker thread.
+  ThreadRunner threadRunner_;
+
   /// This is executed on a new thread. It will run forever, executing tasks as
   /// they are posted. This stops running when shouldStop_ is set to true.
   void run();
@@ -76,14 +96,19 @@ class SerialExecutor {
   static constexpr std::chrono::nanoseconds kDefaultTimeout =
       std::chrono::hours(24);
 
-  /// Initialize a SerialExecutor with a worker thread that has a stack size of
-  /// \p stackSize and will remain live for \p timeout without additional work.
+  /// Initialize a SerialExecutor whose worker thread has a stack size of
+  /// \p stackSize, remains live for \p timeout without additional work, and is
+  /// wrapped by \p threadRunner when it is created. \p threadRunner must
+  /// satisfy the contract documented on ThreadRunner.
   /// \p timeout can not be too large, otherwise `steady_clock::now() + timeout`
   /// may overflow.
   SerialExecutor(
       size_t stackSize = 0,
-      std::chrono::nanoseconds timeout = kDefaultTimeout)
-      : stackSize_(stackSize), timeout_(timeout) {
+      std::chrono::nanoseconds timeout = kDefaultTimeout,
+      ThreadRunner threadRunner = {})
+      : stackSize_(stackSize),
+        timeout_(timeout),
+        threadRunner_(std::move(threadRunner)) {
     // run() waits with wait_for, which is specified as
     // wait_until(now() + timeout_). Reject a timeout that cannot survive that
     // addition here.

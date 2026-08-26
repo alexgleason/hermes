@@ -109,7 +109,12 @@ void SerialExecutor::run() {
 }
 
 void *SerialExecutor::threadMain(void *p) {
-  static_cast<SerialExecutor *>(p)->run();
+  auto *executor = static_cast<SerialExecutor *>(p);
+  if (executor->threadRunner_) {
+    executor->threadRunner_([executor] { executor->run(); });
+  } else {
+    executor->run();
+  }
   return nullptr;
 }
 

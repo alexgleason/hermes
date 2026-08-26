@@ -68,6 +68,10 @@
 #include <jsi/instrumentation.h>
 #include <jsi/threadsafe.h>
 
+#ifdef __ANDROID__
+#include <fbjni/fbjni.h>
+#endif
+
 #ifdef HERMESVM_LLVM_PROFILE_DUMP
 extern "C" {
 int __llvm_profile_dump(void);
@@ -248,6 +252,31 @@ namespace {
 using EventLoopCallback = const std::function<void()>;
 using ScheduleCallbackFunc = std::function<void(EventLoopCallback)>;
 
+/// Return the runner that wraps the finalizer worker thread, or an empty runner
+/// to leave the thread unwrapped.
+::hermes::SerialExecutor::ThreadRunner makeFinalizerThreadRunner() {
+#ifdef __ANDROID__
+  return [](std::function<void()> run) {
+    // Finalizers may release JNI references, which requires the thread to be
+    // attached to the JVM. ThreadScope's constructor throws when fbjni has no
+    // JavaVM. Nothing may escape into SerialExecutor, which is compiled
+    // without exceptions, so report any failure as a Hermes fatal error
+    // instead of letting it terminate the process without a diagnostic.
+    try {
+      const facebook::jni::ThreadScope scope;
+      run();
+    } catch (const std::exception &e) {
+      ::hermes::hermes_fatal(
+          std::string("Exception on the JSI finalizer thread: ") + e.what());
+    } catch (...) {
+      ::hermes::hermes_fatal("Unknown exception on the JSI finalizer thread");
+    }
+  };
+#else
+  return {};
+#endif
+}
+
 class HermesRuntimeImpl final : public HermesRuntime,
                                 private IHermesTestHelpers,
                                 private InstallHermesFatalErrorHandler,
@@ -265,7 +294,11 @@ class HermesRuntimeImpl final : public HermesRuntime,
         weakHermesValues_(runtimeConfig.getGCConfig().getOccupancyTarget()),
         rt_(::hermes::vm::Runtime::create(runtimeConfig)),
         runtime_(*rt_),
-        vmExperimentFlags_(runtimeConfig.getVMExperimentFlags()) {
+        vmExperimentFlags_(runtimeConfig.getVMExperimentFlags()),
+        finalizerExecutor_(
+            0,
+            ::hermes::SerialExecutor::kDefaultTimeout,
+            makeFinalizerThreadRunner()) {
 #ifdef HERMES_ENABLE_DEBUGGER
     compileFlags_.debug = true;
 #endif
