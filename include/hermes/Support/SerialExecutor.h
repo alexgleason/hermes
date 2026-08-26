@@ -9,6 +9,7 @@
 #define HERMES_SERIALEXECUTOR_SERIALEXECUTOR_H
 
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -60,7 +61,7 @@ class SerialExecutor {
 
   /// The configured timeout after which the worker thread will exit if no
   /// additional work is enqueued.
-  std::chrono::milliseconds timeout_;
+  std::chrono::nanoseconds timeout_;
 
   /// This is executed on a new thread. It will run forever, executing tasks as
   /// they are posted. This stops running when shouldStop_ is set to true.
@@ -70,12 +71,28 @@ class SerialExecutor {
   static void *threadMain(void *p);
 
  public:
+  /// Idle timeout used when the caller does not pick one. Just a reasonably
+  /// large enough duration.
+  static constexpr std::chrono::nanoseconds kDefaultTimeout =
+      std::chrono::hours(24);
+
   /// Initialize a SerialExecutor with a worker thread that has a stack size of
   /// \p stackSize and will remain live for \p timeout without additional work.
+  /// \p timeout can not be too large, otherwise `steady_clock::now() + timeout`
+  /// may overflow.
   SerialExecutor(
       size_t stackSize = 0,
-      std::chrono::milliseconds timeout = std::chrono::milliseconds::max())
-      : stackSize_(stackSize), timeout_(timeout) {}
+      std::chrono::nanoseconds timeout = kDefaultTimeout)
+      : stackSize_(stackSize), timeout_(timeout) {
+    // run() waits with wait_for, which is specified as
+    // wait_until(now() + timeout_). Reject a timeout that cannot survive that
+    // addition here.
+    assert(timeout_.count() >= 0 && "SerialExecutor timeout is negative");
+    assert(
+        timeout_ <= std::chrono::steady_clock::time_point::max() -
+                std::chrono::steady_clock::now() &&
+        "SerialExecutor timeout overflows steady_clock::now() + timeout");
+  }
 
   /// Make sure that the spawned thread has terminated. Will block if there is a
   /// long-running task currently being executed.
