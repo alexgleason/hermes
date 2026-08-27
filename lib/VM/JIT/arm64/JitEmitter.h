@@ -12,6 +12,7 @@
 #include "hermes/ADT/DenseUInt64.h"
 #include "hermes/ADT/SimpleLRU.h"
 #include "hermes/Support/OptValue.h"
+#include "hermes/VM/CellKind.h"
 #include "hermes/VM/CodeBlock.h"
 #include "hermes/VM/JIT/JIT.h"
 #include "hermes/VM/JIT/PerfJitDump.h"
@@ -22,6 +23,7 @@
 
 #include "llvh/ADT/DenseMap.h"
 
+#include <cstdarg>
 #include <deque>
 
 namespace hermes::vm::arm64 {
@@ -446,7 +448,13 @@ class Emitter {
 
   /// Log a comment.
   /// Annotated with printf-style format.
+  /// Defined inline below the class so the logger check is visible in every
+  /// translation unit; the formatting itself is out of line in commentV().
   void comment(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+
+  /// Format \p fmt with \p args and pass the result to the assembler. Out of
+  /// line so that vsnprintf is not duplicated into every caller.
+  void commentV(const char *fmt, va_list args);
 
   /// Emit the catch table, slow paths, thunks and RO data,
   /// then reset the stack, end any try, and return.
@@ -1422,5 +1430,79 @@ class Emitter {
   /// \return 0 if too many IDs have been assigned.
   uint16_t initHCLazyIDMayAlloc(HiddenClass *hc);
 }; // class Emitter
+
+/// Only the logger check lives here; the formatting is out of line in
+/// commentV(). The check has to be visible to every emitter translation unit:
+/// when ASMJIT_NO_LOGGING is defined hasLogger() folds to a constant false, so
+/// the compiler can drop the call and dead-strip the format string. With the
+/// whole body in JitEmitter.cpp, callers in other translation units had to
+/// materialise and pass every string, which cost ~4KB of .cstring. Keeping
+/// vsnprintf out of line means enabling logging does not duplicate the
+/// formatting code into each caller.
+inline void Emitter::comment(const char *fmt, ...) {
+  if (!hasLogger())
+    return;
+  va_list args;
+  va_start(args, fmt);
+  commentV(fmt, args);
+  va_end(args);
+}
+
+/// Return true if the specified 64-bit value can be efficiently loaded on
+/// Arm64 with up to two integer instructions. In other words, it has at most
+/// two non-zero 16-bit words.
+inline bool isCheapConst(uint64_t k) {
+  unsigned count = 0;
+  for (uint64_t mask = 0xFFFF; mask != 0; mask <<= 16) {
+    if (k & mask)
+      ++count;
+  }
+  return count <= 2;
+}
+
+template <bool use>
+void Emitter::movHWFromHW(HWReg dst, HWReg src) {
+  if (dst != src) {
+    if (dst.isVecD() && src.isVecD())
+      a.fmov(dst.a64VecD(), src.a64VecD());
+    else if (dst.isVecD())
+      a.fmov(dst.a64VecD(), src.a64GpX());
+    else if (src.isVecD())
+      a.fmov(dst.a64GpX(), src.a64VecD());
+    else
+      a.mov(dst.a64GpX(), src.a64GpX());
+  }
+  if constexpr (use) {
+    useReg(src);
+    useReg(dst);
+  }
+}
+
+template <class TAG>
+HWReg Emitter::_allocTemp(TempRegAlloc &ra, llvh::Optional<HWReg> preferred) {
+  llvh::Optional<unsigned> pr{};
+  if (preferred)
+    pr = preferred->indexInClass();
+  if (auto optReg = ra.alloc(pr); optReg)
+    return HWReg(*optReg, TAG{});
+  // Spill one register.
+  unsigned index = pr ? *pr : ra.leastRecentlyUsed();
+  _spillTempForFR(HWReg(index, TAG{}));
+  ra.free(index);
+  // Allocate again. This must succeed.
+  return HWReg(*ra.alloc(), TAG{});
+}
+
+template <typename REG>
+void Emitter::loadBits64InGp(
+    const REG &dest,
+    uint64_t bits,
+    const char *constName) {
+  if (isCheapConst(bits)) {
+    a.mov(dest, bits);
+  } else {
+    a.ldr(dest, a64::Mem(roDataLabel_, uint64Const(bits, constName)));
+  }
+}
 
 } // namespace hermes::vm::arm64

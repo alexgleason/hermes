@@ -747,18 +747,6 @@ inline bool isStpGpXImm(int i) {
     expectedError_ = asmjit::kErrorOk;        \
   } while (0)
 
-/// Return true if the specified 64-bit value can be efficiently loaded on
-/// Arm64 with up to two integer instructions. In other words, it has at most
-/// two non-zero 16-bit words.
-inline bool isCheapConst(uint64_t k) {
-  unsigned count = 0;
-  for (uint64_t mask = 0xFFFF; mask != 0; mask <<= 16) {
-    if (k & mask)
-      ++count;
-  }
-  return count <= 2;
-}
-
 /// Save the current IP and emit a call to a runtime function. This should be
 /// used in most cases when invoking slow paths and handlers for complex
 /// functionality.

@@ -26,6 +26,7 @@
 #include "hermes/VMLayouts/StackFrameLayout.h"
 #include "llvh/ADT/Statistic.h"
 
+#include <cstdio>
 #include <limits>
 
 #define DEBUG_TYPE "jit"
@@ -166,14 +167,9 @@ void Emitter::enter(uint32_t numCount, uint32_t npCount) {
       frameRegs_.size(), nextGp - kGPSaved.first, nextVec - kVecSaved.first);
 }
 
-void Emitter::comment(const char *fmt, ...) {
-  if (!hasLogger())
-    return;
-  va_list args;
-  va_start(args, fmt);
+void Emitter::commentV(const char *fmt, va_list args) {
   char buf[80];
   vsnprintf(buf, sizeof(buf), fmt, args);
-  va_end(args);
   a.comment(buf);
 }
 
@@ -711,24 +707,6 @@ void Emitter::loadFrameAddr(a64::GpX dst, FR frameReg) {
   a.add(dst, dst, xFrame);
 }
 
-template <bool use>
-void Emitter::movHWFromHW(HWReg dst, HWReg src) {
-  if (dst != src) {
-    if (dst.isVecD() && src.isVecD())
-      a.fmov(dst.a64VecD(), src.a64VecD());
-    else if (dst.isVecD())
-      a.fmov(dst.a64VecD(), src.a64GpX());
-    else if (src.isVecD())
-      a.fmov(dst.a64GpX(), src.a64VecD());
-    else
-      a.mov(dst.a64GpX(), src.a64GpX());
-  }
-  if constexpr (use) {
-    useReg(src);
-    useReg(dst);
-  }
-}
-
 void Emitter::_storeHWToFrame(FR fr, HWReg src) {
   _storeFrame(src, fr);
   frameRegs_[fr.index()].frameUpToDate = true;
@@ -789,21 +767,6 @@ void Emitter::syncFrameOutParam(FR fr, FRType type) {
     _loadFrame(frState.globalReg, fr);
   }
   frUpdateType(fr, type);
-}
-
-template <class TAG>
-HWReg Emitter::_allocTemp(TempRegAlloc &ra, llvh::Optional<HWReg> preferred) {
-  llvh::Optional<unsigned> pr{};
-  if (preferred)
-    pr = preferred->indexInClass();
-  if (auto optReg = ra.alloc(pr); optReg)
-    return HWReg(*optReg, TAG{});
-  // Spill one register.
-  unsigned index = pr ? *pr : ra.leastRecentlyUsed();
-  _spillTempForFR(HWReg(index, TAG{}));
-  ra.free(index);
-  // Allocate again. This must succeed.
-  return HWReg(*ra.alloc(), TAG{});
 }
 
 void Emitter::freeReg(HWReg hwReg) {
@@ -1399,18 +1362,6 @@ void Emitter::loadConstDouble(FR frRes, double val, const char *name) {
     }
   }
   frUpdatedWithHW(frRes, hwRes, FRType::Number);
-}
-
-template <typename REG>
-void Emitter::loadBits64InGp(
-    const REG &dest,
-    uint64_t bits,
-    const char *constName) {
-  if (isCheapConst(bits)) {
-    a.mov(dest, bits);
-  } else {
-    a.ldr(dest, a64::Mem(roDataLabel_, uint64Const(bits, constName)));
-  }
 }
 
 void Emitter::loadSmallHermesValueInGpX(
