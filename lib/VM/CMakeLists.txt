@@ -167,6 +167,7 @@ if (HERMESVM_ALLOW_JIT)
           JIT/arm64/JitEmitter-object.cpp
           JIT/arm64/JitEmitter-property.cpp
           JIT/arm64/JitEmitter-call.cpp
+          JIT/arm64/JitEmitter-env.cpp
           JIT/arm64/JIT.cpp
           JIT/arm64/JitHandlers.cpp JIT/arm64/JitHandlers.h
           JIT/PerfJitDump.cpp
