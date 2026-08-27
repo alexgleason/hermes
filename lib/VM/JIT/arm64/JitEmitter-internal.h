@@ -793,6 +793,89 @@ inline bool isCheapConst(uint64_t k) {
     (em).callWithoutThunk((void *)func, #func);                      \
   } while (0)
 
+/// Load the lengthAndFlags of a HermesValue that contains a StringPrimitive
+/// into \p xOut.
+/// xOut and xIn may be the same, but xIn will be clobbered.
+/// \param xOut the output register for the length, which will be placed
+///  in xOut.w().
+/// \param xIn the input register containing the string HermesValue.
+void emit_stringprim_get_length_and_flags(
+    a64::Assembler &a,
+    const a64::GpX &xOut,
+    const a64::GpX &xIn);
+
+/// Emit code to initialize the fields on a JSObject.
+/// \param xObj contains a pointer to the object to initialise.
+/// \param xParent contains a compressed pointer to the parent object.
+/// \param xTempOrPropStorageOpt is a temporary register. It may contain
+///   a pointer to the PropStorage. If \p HasPropStorage is true, it's
+///   used to initialize the PropStorage, otherwise it's used as a temporary
+///   register.
+///   Either way, the value in xTempOrPropStorageOpt WILL be overwritten.
+/// \param xClazzOpt if invalid will use the default JSObject HiddenClass,
+///   otherwise a compressed pointer to the HiddenClass of the new object.
+void emit_jsobject_init(
+    a64::Assembler &a,
+    const a64::GpX &xObj,
+    const a64::GpX &xParent,
+    const a64::GpX &xTempOrPropStorageOpt,
+    bool hasPropStorage,
+    const a64::GpX &xClazzOpt = a64::GpX{});
+
+/// Emit code to initialize the fields of a newly created environment.
+/// \param xNewEnvPtr contains a pointer to the object to initialise.
+/// \param xParentEnv contains a compressed pointer to the parent environment.
+/// \param xTemp is a temporary register for use by the emitted code.
+/// \param vTemp is a temporary vector register for use by the emitted code.
+/// \param size is the number of slots in the new environment.
+void emit_environment_init(
+    a64::Assembler &a,
+    const a64::GpX &xNewEnvPtr,
+    const a64::GpX &xParentEnv,
+    const a64::GpX &xTemp,
+    const a64::VecV &vTemp,
+    uint32_t size);
+
+class OurErrorHandler : public asmjit::ErrorHandler {
+  asmjit::Error &expectedError_;
+  std::function<void(std::string &&message)> const longjmpError_;
+
+ public:
+  /// \param expectedError if we get an error matching this value, we ignore it.
+  explicit OurErrorHandler(
+      asmjit::Error &expectedError,
+      const std::function<void(std::string &&message)> &longjmpError)
+      : expectedError_(expectedError), longjmpError_(longjmpError) {}
+
+  void handleError(
+      asmjit::Error err,
+      const char *message,
+      asmjit::BaseEmitter *origin) override;
+};
+
+/// Helper function to load a pointer to the builtin closure with index
+/// \p builtinIndex and place it in \p xRes.
+void emit_load_builtin_closure(
+    a64::Assembler &a,
+    const a64::GpX &xRes,
+    uint32_t builtinIndex);
+
+#ifndef ASMJIT_NO_LOGGING
+class OurLogger : public asmjit::Logger {
+ private:
+  a64::Assembler &a_;
+  PerfJitDump *perfJitDump_{nullptr};
+  bool dumpJitCode_{false};
+
+ public:
+  OurLogger(a64::Assembler &a, PerfJitDump *perfJitDump, bool dumpJitCode)
+      : a_(a), perfJitDump_(perfJitDump), dumpJitCode_(dumpJitCode) {}
+
+  ASMJIT_API asmjit::Error _log(const char *data, size_t size) noexcept
+      override;
+};
+#endif
+
 } // namespace hermes::vm::arm64
 
 #endif // HERMESVM_JIT
