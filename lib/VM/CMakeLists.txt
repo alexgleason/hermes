@@ -170,6 +170,7 @@ if (HERMESVM_ALLOW_JIT)
           JIT/arm64/JitEmitter-env.cpp
           JIT/arm64/JitEmitter-array.cpp
           JIT/arm64/JitEmitter-arith.cpp
+          JIT/arm64/JitEmitter-control.cpp
           JIT/arm64/JIT.cpp
           JIT/arm64/JitHandlers.cpp JIT/arm64/JitHandlers.h
           JIT/PerfJitDump.cpp

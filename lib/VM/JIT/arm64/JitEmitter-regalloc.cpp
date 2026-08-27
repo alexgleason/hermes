@@ -9,7 +9,6 @@
 #if HERMESVM_JIT
 #include "JitEmitter-internal.h"
 #include "JitEmitter.h"
-#include "JitImpl.h"
 
 namespace hermes::vm::arm64 {
 
