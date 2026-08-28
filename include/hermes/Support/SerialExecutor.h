@@ -11,6 +11,7 @@
 #include "llvh/ADT/FunctionExtras.h"
 
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -74,7 +75,7 @@ class SerialExecutor {
 
   /// The configured timeout after which the worker thread will exit if no
   /// additional work is enqueued.
-  std::chrono::milliseconds timeout_;
+  std::chrono::nanoseconds timeout_;
 
   /// If set, wraps execution of each worker thread. This is the same as
   /// ThreadRunner defined in RuntimeConfig.h.
@@ -88,18 +89,33 @@ class SerialExecutor {
   static void *threadMain(void *p);
 
  public:
+  /// Idle timeout used when the caller does not pick one. Just a reasonably
+  /// large enough duration.
+  static constexpr std::chrono::nanoseconds kDefaultTimeout =
+      std::chrono::hours(24);
+
   /// Initialize a SerialExecutor whose worker thread has a stack size of
   /// \p stackSize, remains live for \p timeout without additional work, and is
   /// wrapped by \p threadRunner when it is created. \p threadRunner must
   /// satisfy the contract documented on vm::ThreadRunner. In addition, it must
-  /// not block after run() returns.
+  /// not block after run() returns. \p timeout can not be too large, otherwise
+  /// `steady_clock::now() + timeout` may overflow.
   SerialExecutor(
       size_t stackSize = 0,
-      std::chrono::milliseconds timeout = std::chrono::milliseconds::max(),
+      std::chrono::nanoseconds timeout = kDefaultTimeout,
       std::function<void(std::function<void()>)> threadRunner = {})
       : stackSize_(stackSize),
         timeout_(timeout),
-        threadRunner_(std::move(threadRunner)) {}
+        threadRunner_(std::move(threadRunner)) {
+    // run() waits with wait_for, which is specified as
+    // wait_until(now() + timeout_). Reject a timeout that cannot survive that
+    // addition here.
+    assert(timeout_.count() >= 0 && "SerialExecutor timeout is negative");
+    assert(
+        timeout_ <= std::chrono::steady_clock::time_point::max() -
+                std::chrono::steady_clock::now() &&
+        "SerialExecutor timeout overflows steady_clock::now() + timeout");
+  }
 
   /// Make sure that the spawned thread has terminated. Will block if there is a
   /// long-running task currently being executed.

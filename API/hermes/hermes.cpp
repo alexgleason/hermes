@@ -308,7 +308,7 @@ class HermesRuntimeImpl final : public HermesRuntime,
         vmExperimentFlags_(runtimeConfig.getVMExperimentFlags()),
         finalizerExecutor_(
             0,
-            std::chrono::milliseconds::max(),
+            ::hermes::SerialExecutor::kDefaultTimeout,
             finalizerThreadRunner(runtimeConfig)),
         mutatorScope{runtime_} {
 #ifdef HERMES_ENABLE_DEBUGGER

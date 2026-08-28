@@ -146,6 +146,34 @@ TEST(SerialExecutorTest, ThreadRunnerWrapsEachWorker) {
   EXPECT_EQ(exits, 5);
 }
 
+TEST(SerialExecutorTest, DefaultTimeoutKeepsOneWorker) {
+  // The default timeout means "outlive any realistic gap between tasks", so a
+  // run of sequential tasks must be served by a single worker. Spelling it
+  // milliseconds::max() did not do that: wait_for is specified as
+  // wait_until(now() + rel_time), which overflowed and returned immediately,
+  // so the worker exited after every task and each add() created a new one.
+  std::atomic<int> starts{0};
+  std::atomic<int> done{0};
+  hermes::SerialExecutor executor{
+      0,
+      hermes::SerialExecutor::kDefaultTimeout,
+      [&starts](std::function<void()> run) {
+        ++starts;
+        run();
+      }};
+
+  for (int i = 1; i <= 10; ++i) {
+    executor.add([&done] { ++done; });
+    ASSERT_TRUE(waitFor([&done, i] { return done >= i; }))
+        << "task " << i << " never ran";
+    // Leave a gap for a worker that wrongly considers its timeout expired to
+    // notice and exit.
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+
+  EXPECT_EQ(starts, 1) << "the worker did not survive between tasks";
+}
+
 TEST(SerialExecutorTest, TaskDestructorCanEnqueue) {
   // A task's captured state belongs to the caller, so destroying a finished
   // task runs caller code that may enqueue more work -- a JSI finalizer that
@@ -204,13 +232,9 @@ TEST(SerialExecutorTest, TaskCanEnqueueWhileDraining) {
   // worker is gone" and spawn a second one. Doing so overwrites tid_ out from
   // under the join, and resets threadState_ so the drain loop never sees
   // Terminating, leaving both workers parked on the condition variable.
-  //
-  // The timeout is finite on purpose. With the default of milliseconds::max()
-  // the wait overflows to a deadline in the past and returns immediately, so
-  // stranded workers exit by accident and hide the deadlock.
   std::atomic<bool> release{false};
   std::atomic<bool> followUpRan{false};
-  auto *executor = new hermes::SerialExecutor(0, std::chrono::hours(1));
+  auto *executor = new hermes::SerialExecutor();
 
   executor->add([executor, &release, &followUpRan] {
     // Stay in the body until teardown has plausibly begun, so the add() below
