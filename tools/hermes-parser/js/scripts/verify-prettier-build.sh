@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRETTIER_PLUGIN_WRAPPER="$SCRIPT_DIR/../prettier-plugin-hermes-parser/index.mjs"
 MINIFIED_PRETTIER_PLUGIN="$SCRIPT_DIR/../prettier-plugin-hermes-parser/index.generated.mjs"
 XPLAT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
-NODE="$XPLAT/third-party/node/v24.17.0/node"
+NODE="$XPLAT/third-party/node/v24.18.1/node"
 
 # Save original file info and content BEFORE running the build
 ORIGINAL_SIZE=$(wc -c < "$MINIFIED_PRETTIER_PLUGIN")
