@@ -305,6 +305,29 @@ Community contributions go in `extensions/contrib/`. These are:
 
 See `API/hermes/extensions/contrib/README.md` for contributor guidelines.
 
+## Issue Tracking
+
+Bugs and follow-ups that outlive a session live in `dz/`, a
+[ditz2](https://github.com/tmikov/ditz2) project: one markdown file per
+issue, committed alongside the code. Use it for what a commit message or
+progress note cannot hold — a defect nobody is working on yet, a
+limitation recorded rather than fixed, a follow-up that would otherwise
+be forgotten.
+
+Run the `dz` command from `PATH`. **If `dz` is not available, ask the
+user how to proceed** — do not install it, build it, or substitute
+another tool.
+
+- `dz help agents` is the contract for programmatic use: every command
+  takes `--json`, exit 0 means stdout parses, errors go to stderr as one
+  object.
+- The component list starts empty and `--component` rejects every value
+  until it is populated. Add one when an issue needs it:
+  `dz component add <name>`.
+- `dz/config.local.yaml` (author identity) and `dz/.lock` are gitignored
+  (by `dz/.gitignore`); `dz/config.yaml` and `dz/issues/*.md` are
+  committed.
+
 ## Environment-Specific Instructions
 
 This project exists in two environments. The presence of the `facebook/` directory indicates which environment you are in. **Only read the file corresponding to the current environment:**
